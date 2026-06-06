@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mô phỏng Pallet - Tùy chỉnh màu sắc riêng biệt</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #e3f2fd; }
+        #controls {
+            position: absolute; top: 15px; left: 15px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px 25px; border-radius: 10px;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            z-index: 100; box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            font-size: 14px; box-sizing: border-box;
+            border-left: 5px solid #4CAF50;
+        }
+        .highlight { color: #1976D2; font-weight: bold; }
+        h4 { margin: 0 0 10px 0; color: #333; }
+        ul { margin: 5px 0 0 0; padding-left: 20px; color: #555; }
+        li { margin-bottom: 4px; }
+        .green-text { color: #00FF00; font-weight: bold; text-shadow: 1px 1px 1px #000; }
+        .red-text { color: #FF0000; font-weight: bold; text-shadow: 1px 1px 1px #000; }
+    </style>
+</head>
+<body>
+
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xcbe1f5);
+
+        // Đặt góc nhìn Camera dạng chéo từ trên xuống (Isometric)
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(5, 8, 10); 
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.target.set(0, 1.5, 0); 
+        controls.maxPolarAngle = Math.PI / 2; // Giới hạn không cho góc quay đâm xuyên xuống lòng đất
+
+        // Ánh sáng
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(15, 25, 20);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+
+        // Nền đất
+        const planeGeo = new THREE.PlaneGeometry(100, 100);
+        const planeMat = new THREE.MeshLambertMaterial({ color: 0x999999 }); 
+        const plane = new THREE.Mesh(planeGeo, planeMat);
+        plane.rotation.x = -Math.PI / 2;
+        plane.receiveShadow = true;
+        scene.add(plane);
+
+        // Hàm tạo Nhãn chữ
+        function createTextSprite(text, style) {
+            const canvas = document.createElement('canvas');
+            canvas.width = (style === 'dim') ? 256 : 128;
+            canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            if (style === 'dim') {
+                ctx.fillStyle = 'rgba(30, 30, 30, 0.9)';
+                ctx.roundRect(28, 30, 200, 68, 12);
+                ctx.fill();
+
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = '#ff3d00'; 
+                ctx.strokeRect(28, 30, 200, 68);
+
+                ctx.font = 'bold 36px Arial';
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText(text, 128, 64);
+            } else if (style === 'top') {
+                ctx.beginPath();
+                ctx.arc(64, 64, 45, 0, Math.PI * 2);
+                ctx.fillStyle = '#ffeb3b';
+                ctx.fill();
+                
+                ctx.lineWidth = 4;
+                ctx.strokeStyle = '#000000';
+                ctx.stroke();
+
+                ctx.font = 'bold 45px Arial';
+                ctx.fillStyle = '#000000';
+                ctx.fillText(text, 64, 64);
+            } else {
+                ctx.font = 'bold 70px Arial';
+                ctx.lineWidth = 6;
+                ctx.strokeStyle = '#000000';
+                ctx.strokeText(text, 64, 64);
+                
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText(text, 64, 64);
+            }
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            const material = new THREE.SpriteMaterial({ map: texture, depthTest: true });
+            const sprite = new THREE.Sprite(material);
+            
+            if (style === 'dim') sprite.scale.set(1.0, 0.5, 1);
+            else if (style === 'top') sprite.scale.set(0.3, 0.3, 1);
+            else sprite.scale.set(0.25, 0.25, 1);
+            
+            return sprite;
+        }
+
+        // Hàm tạo đường gióng kích thước mũi tên 2 chiều
+        function createDimensionArrow(p1, p2, text) {
+            const group = new THREE.Group();
+            const color = 0xd32f2f; // Đỏ
+
+            const points = [p1, p2];
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            const material = new THREE.LineBasicMaterial({ color: color, linewidth: 2 });
+            const line = new THREE.Line(geometry, material);
+            group.add(line);
+
+            const dir = new THREE.Vector3().subVectors(p2, p1).normalize();
+            const coneGeo = new THREE.ConeGeometry(0.04, 0.12, 8);
+            const coneMat = new THREE.MeshBasicMaterial({ color: color });
+
+            const cone1 = new THREE.Mesh(coneGeo, coneMat);
+            cone1.position.copy(p2);
+            cone1.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+            group.add(cone1);
+
+            const cone2 = new THREE.Mesh(coneGeo, coneMat);
+            cone2.position.copy(p1);
+            cone2.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().negate());
+            group.add(cone2);
+
+            const sprite = createTextSprite(text, 'dim');
+            const midPoint = new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5);
+            sprite.position.copy(midPoint);
+            sprite.position.y += 0.18;
+            group.add(sprite);
+
+            return group;
+        }
+
+        // Tạo cụm Pallet (thêm biến isAllGreen để kiểm soát màu)
+        function createPalletGroup(offsetX, offsetZ, isAllGreen) {
+            const group = new THREE.Group();
+            
+            const tCols = 2;  
+            const tDepth = 3; 
+            const tRows = 10; 
+
+            const palletWidth = 1.0;
+            const palletDepth = 1.2;
+            const gap = 0.02;
+
+            const boxW = (palletWidth / tCols) - gap; 
+            const boxD = (palletDepth / tDepth) - gap;
+            const boxH = 0.35; 
+            
+            const geometry = new THREE.BoxGeometry(boxW, boxH, boxD);
+
+            for (let x = 0; x < tCols; x++) {
+                for (let y = 0; y < tRows; y++) {
+                    for (let z = 0; z < tDepth; z++) {
+                        
+                        let targetColor = 0x00FF00; // Xanh lá mặc định
+                        
+                        // Nếu không phải là Pallet xanh 100%, áp dụng luật màu Đỏ cho hàng 3 đến 8 (y từ 2 đến 7)
+                        if (!isAllGreen && y >= 2 && y <= 7) {
+                            targetColor = 0xFF0000; // Đỏ
+                        }
+
+                        const material = new THREE.MeshLambertMaterial({ color: targetColor });
+                        const box = new THREE.Mesh(geometry, material);
+                        
+                        const posX = (x - tCols/2 + 0.5) * (boxW + gap);
+                        const posY = y * (boxH + gap) + (boxH/2) + 0.15; 
+                        const posZ = (z - tDepth/2 + 0.5) * (boxD + gap);
+                        
+                        box.position.set(posX, posY, posZ);
+                        box.castShadow = true;
+                        box.receiveShadow = true;
+
+                        const edges = new THREE.EdgesGeometry(geometry);
+                        const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x333333, linewidth: 1 }));
+                        box.add(line);
+
+                        group.add(box);
+
+                        // --- ĐÁNH SỐ CHO MẶT TRÊN CÙNG (Lớp 10) ---
+                        if (y === tRows - 1) {
+                            const topIndex = (z * tCols) + x + 1; 
+                            const topSprite = createTextSprite(topIndex.toString(), 'top');
+                            topSprite.position.set(posX, posY + boxH / 2 + 0.08, posZ);
+                            group.add(topSprite);
+                        }
+
+                        // --- ĐÁNH SỐ THEO TỌA ĐỘ BỀ MẶT BÊN NGOÀI ---
+                        let textFront = "";
+                        let textSide = "";
+
+                        if (z === tDepth - 1) {
+                            if (y === tRows - 1) textFront = (x + 1).toString(); 
+                            else if (x === 0) textFront = (tRows - y).toString(); 
+                        }
+
+                        if (x === 0 || x === tCols - 1) {
+                            if (y === tRows - 1) textSide = (z + 1).toString(); 
+                            else if (z === tDepth - 1) textSide = (tRows - y).toString(); 
+                        }
+
+                        if (textFront !== "") {
+                            const spriteFront = createTextSprite(textFront, 'normal');
+                            spriteFront.position.set(posX, posY, posZ + boxD / 2 + 0.05);
+                            group.add(spriteFront);
+                        }
+
+                        if (textSide !== "") {
+                            const spriteSide = createTextSprite(textSide, 'normal');
+                            const textOffsetX = (x === 0) ? -boxW / 2 - 0.05 : boxW / 2 + 0.05;
+                            spriteSide.position.set(posX + textOffsetX, posY, posZ);
+                            group.add(spriteSide);
+                        }
+                    }
+                }
+            }
+
+            // --- TẠO ĐẾ PALLET ---
+            const baseGeo = new THREE.BoxGeometry(palletWidth, 0.15, palletDepth);
+            const baseMat = new THREE.MeshLambertMaterial({ color: 0x1976D2 }); 
+            const baseMesh = new THREE.Mesh(baseGeo, baseMat);
+            baseMesh.position.set(0, 0.15 / 2, 0); 
+            baseMesh.castShadow = true;
+            baseMesh.receiveShadow = true;
+            group.add(baseMesh);
+
+            // --- TẠO MŨI TÊN KÍCH THƯỚC ---
+            const arrowX = createDimensionArrow(
+                new THREE.Vector3(-palletWidth/2, 0.05, palletDepth/2 + 0.25),
+                new THREE.Vector3(palletWidth/2, 0.05, palletDepth/2 + 0.25),
+                "1m"
+            );
+            group.add(arrowX);
+
+            const arrowZ = createDimensionArrow(
+                new THREE.Vector3(palletWidth/2 + 0.25, 0.05, -palletDepth/2),
+                new THREE.Vector3(palletWidth/2 + 0.25, 0.05, palletDepth/2),
+                "1.2m"
+            );
+            group.add(arrowZ);
+
+            group.position.set(offsetX, 0, offsetZ);
+            return group;
+        }
+
+        // Tạo Pallet 1 (bên trái): Có chứa hàng nguy hiểm màu Đỏ (isAllGreen = false)
+        const pallet1 = createPalletGroup(-1.5, 0, false); 
+        scene.add(pallet1);
+
+        // Tạo Pallet 2 (bên phải): 100% màu Xanh lá (isAllGreen = true)
+        const pallet2 = createPalletGroup(1.5, 0, true);  
+        scene.add(pallet2);
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>
