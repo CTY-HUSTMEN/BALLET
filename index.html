@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mô phỏng Pallet - Tùy chỉnh màu sắc riêng biệt</title>
+    <title>Mô phỏng 2 Pallet Nằm Ngang - Tách Trái Phải</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #e3f2fd; }
         #controls {
@@ -25,7 +25,16 @@
 </head>
 <body>
 
-    
+    <div id="controls">
+        <h4>Mô phỏng 2 Pallet</h4>
+        <div><span class="highlight">Kích thước:</span></div>
+        <ul>
+            <li>Mỗi Pallet có kích thước 1m x 1.2m</li>
+            <li>Pallet 1 (Trái): Chứa hàng <span class="red-text">nguy hiểm</span> (Lớp 3-8)</li>
+            <li>Pallet 2 (Phải): 100% hàng <span class="green-text">an toàn</span></li>
+        </ul>
+    </div>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 
@@ -33,9 +42,8 @@
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0xcbe1f5);
 
-        // Đặt góc nhìn Camera dạng chéo từ trên xuống (Isometric)
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(5, 8, 10); 
+        camera.position.set(0, 6, 12); 
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -45,8 +53,8 @@
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.05;
-        controls.target.set(0, 1.5, 0); 
-        controls.maxPolarAngle = Math.PI / 2; // Giới hạn không cho góc quay đâm xuyên xuống lòng đất
+        controls.target.set(0, 1.0, 0); 
+        controls.maxPolarAngle = Math.PI / 2; 
 
         // Ánh sáng
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
@@ -155,7 +163,6 @@
             return group;
         }
 
-        // Tạo cụm Pallet (thêm biến isAllGreen để kiểm soát màu)
         function createPalletGroup(offsetX, offsetZ, isAllGreen) {
             const group = new THREE.Group();
             
@@ -177,11 +184,10 @@
                 for (let y = 0; y < tRows; y++) {
                     for (let z = 0; z < tDepth; z++) {
                         
-                        let targetColor = 0x00FF00; // Xanh lá mặc định
+                        let targetColor = 0x00FF00; 
                         
-                        // Nếu không phải là Pallet xanh 100%, áp dụng luật màu Đỏ cho hàng 3 đến 8 (y từ 2 đến 7)
                         if (!isAllGreen && y >= 2 && y <= 7) {
-                            targetColor = 0xFF0000; // Đỏ
+                            targetColor = 0xFF0000;
                         }
 
                         const material = new THREE.MeshLambertMaterial({ color: targetColor });
@@ -201,45 +207,60 @@
 
                         group.add(box);
 
-                        // --- ĐÁNH SỐ CHO MẶT TRÊN CÙNG (Lớp 10) ---
                         if (y === tRows - 1) {
-                            const topIndex = (z * tCols) + x + 1; 
+                            const topIndex = ((tDepth - 1 - z) * tCols) + x + 1; 
                             const topSprite = createTextSprite(topIndex.toString(), 'top');
                             topSprite.position.set(posX, posY + boxH / 2 + 0.08, posZ);
                             group.add(topSprite);
                         }
 
-                        // --- ĐÁNH SỐ THEO TỌA ĐỘ BỀ MẶT BÊN NGOÀI ---
                         let textFront = "";
-                        let textSide = "";
+                        let textSideLeft = ""; 
+                        let textSideRight = "";
 
                         if (z === tDepth - 1) {
-                            if (y === tRows - 1) textFront = (x + 1).toString(); 
-                            else if (x === 0) textFront = (tRows - y).toString(); 
+                            if (y === tRows - 1) {
+                                 textFront = (x + 1).toString(); 
+                            } else if (x === 0) {
+                                textFront = (tRows - y).toString(); 
+                            }
                         }
 
-                        if (x === 0 || x === tCols - 1) {
-                            if (y === tRows - 1) textSide = (z + 1).toString(); 
-                            else if (z === tDepth - 1) textSide = (tRows - y).toString(); 
+                        if (x === 0) {
+                             if (y === tRows - 1) {
+                                const currentZIndex = ((tDepth - 1 - z) * tCols) + x + 1; 
+                                textSideLeft = currentZIndex.toString();
+                            } else if (z === tDepth - 1) {
+                                 textSideLeft = (tRows - y).toString(); 
+                            }
                         }
 
+                        if (x === tCols - 1 && y === tRows - 1) {
+                             const currentZIndex = ((tDepth - 1 - z) * tCols) + x + 1; 
+                             textSideRight = currentZIndex.toString();
+                        }
+                        
                         if (textFront !== "") {
                             const spriteFront = createTextSprite(textFront, 'normal');
                             spriteFront.position.set(posX, posY, posZ + boxD / 2 + 0.05);
                             group.add(spriteFront);
                         }
 
-                        if (textSide !== "") {
-                            const spriteSide = createTextSprite(textSide, 'normal');
-                            const textOffsetX = (x === 0) ? -boxW / 2 - 0.05 : boxW / 2 + 0.05;
-                            spriteSide.position.set(posX + textOffsetX, posY, posZ);
-                            group.add(spriteSide);
+                        if (textSideLeft !== "") {
+                            const spriteSideL = createTextSprite(textSideLeft, 'normal');
+                            spriteSideL.position.set(posX - boxW / 2 - 0.05, posY, posZ); 
+                            group.add(spriteSideL);
+                        }
+
+                        if (textSideRight !== "") {
+                            const spriteSideR = createTextSprite(textSideRight, 'normal');
+                            spriteSideR.position.set(posX + boxW / 2 + 0.05, posY, posZ); 
+                            group.add(spriteSideR);
                         }
                     }
                 }
             }
 
-            // --- TẠO ĐẾ PALLET ---
             const baseGeo = new THREE.BoxGeometry(palletWidth, 0.15, palletDepth);
             const baseMat = new THREE.MeshLambertMaterial({ color: 0x1976D2 }); 
             const baseMesh = new THREE.Mesh(baseGeo, baseMat);
@@ -248,14 +269,15 @@
             baseMesh.receiveShadow = true;
             group.add(baseMesh);
 
-            // --- TẠO MŨI TÊN KÍCH THƯỚC ---
+            // Mũi tên trục X (1m) cho mỗi Pallet
             const arrowX = createDimensionArrow(
-                new THREE.Vector3(-palletWidth/2, 0.05, palletDepth/2 + 0.25),
-                new THREE.Vector3(palletWidth/2, 0.05, palletDepth/2 + 0.25),
+                new THREE.Vector3(-palletWidth/2, 0.05, palletDepth/2 + 0.35),
+                new THREE.Vector3(palletWidth/2, 0.05, palletDepth/2 + 0.35),
                 "1m"
             );
             group.add(arrowX);
 
+            // Mũi tên trục Z (1.2m) cho mỗi Pallet
             const arrowZ = createDimensionArrow(
                 new THREE.Vector3(palletWidth/2 + 0.25, 0.05, -palletDepth/2),
                 new THREE.Vector3(palletWidth/2 + 0.25, 0.05, palletDepth/2),
@@ -267,11 +289,9 @@
             return group;
         }
 
-        // Tạo Pallet 1 (bên trái): Có chứa hàng nguy hiểm màu Đỏ (isAllGreen = false)
         const pallet1 = createPalletGroup(-1.5, 0, false); 
         scene.add(pallet1);
 
-        // Tạo Pallet 2 (bên phải): 100% màu Xanh lá (isAllGreen = true)
         const pallet2 = createPalletGroup(1.5, 0, true);  
         scene.add(pallet2);
 
